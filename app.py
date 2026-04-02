@@ -3,6 +3,7 @@ import numpy as np
 import math
 import os
 import base64
+import gdown
 from flask import Flask, render_template, request, jsonify
 
 # Suppress tensorflow logs
@@ -15,10 +16,21 @@ from cvzone.ClassificationModule import Classifier
 
 app = Flask(__name__)
 
-# Model files
-has_model = os.path.exists("Model/keras_model.h5") and os.path.exists("Model/labels.txt")
+# Auto-download model from Google Drive if not present
+MODEL_PATH = "Model/keras_model.h5"
+LABELS_PATH = "Model/labels.txt"
+GDRIVE_FILE_ID = "1EBdF_aHCWegEtYtj_ElK85DQP3avCwAX"
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model from Google Drive...")
+    os.makedirs("Model", exist_ok=True)
+    gdown.download(f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}", MODEL_PATH, quiet=False)
+    print("Model downloaded successfully!")
+
+# Load model
+has_model = os.path.exists(MODEL_PATH) and os.path.exists(LABELS_PATH)
 detector = HandDetector(maxHands=1) if has_model else None
-classifier = Classifier("Model/keras_model.h5", "Model/labels.txt") if has_model else None
+classifier = Classifier(MODEL_PATH, LABELS_PATH) if has_model else None
 
 offset = 20
 imgSize = 300
@@ -44,10 +56,7 @@ def detect():
         if not data or 'image' not in data:
             return jsonify({"sign": ""}), 400
 
-        # Extract base64 image data (remove the 'data:image/jpeg;base64,' prefix)
         img_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
-        
-        # Decode base64 to OpenCV image
         nparr = np.frombuffer(base64.b64decode(img_data), np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -56,19 +65,18 @@ def detect():
 
         if detector and classifier:
             hands, _ = detector.findHands(img, draw=False)
-            
+
             if hands:
                 hand = hands[0]
                 x, y, w, h = hand['bbox']
 
                 imgWhite = np.ones((imgSize, imgSize, 3), np.uint8) * 255
-                
-                # Boundary checks for cropping
+
                 y1 = max(0, y - offset)
                 y2 = min(img.shape[0], y + h + offset)
                 x1 = max(0, x - offset)
                 x2 = min(img.shape[1], x + w + offset)
-                
+
                 imgCrop = img[y1:y2, x1:x2]
 
                 if imgCrop.size != 0:
@@ -81,23 +89,22 @@ def detect():
                             imgResize = cv2.resize(imgCrop, (wCal, imgSize))
                             wGap = math.ceil((imgSize - wCal) / 2)
                             imgWhite[:, wGap:wCal + wGap] = imgResize
-                            imgInput = cv2.resize(imgWhite, (224, 224))
-                            prediction, index = classifier.getPrediction(imgInput, draw=False)
                         else:
                             k = imgSize / w
                             hCal = math.ceil(k * h)
                             imgResize = cv2.resize(imgCrop, (imgSize, hCal))
                             hGap = math.ceil((imgSize - hCal) / 2)
                             imgWhite[hGap:hCal + hGap, :] = imgResize
-                            imgInput = cv2.resize(imgWhite, (224, 224))
-                            prediction, index = classifier.getPrediction(imgInput, draw=False)
-                            
+
+                        imgInput = cv2.resize(imgWhite, (224, 224))
+                        prediction, index = classifier.getPrediction(imgInput, draw=False)
+
                         if prediction is not None:
                             confidence = prediction[index]
                             if confidence > CONFIDENCE_THRESHOLD:
                                 return jsonify({"sign": labels[index]})
                     except Exception as e:
-                        pass # Silently handle any resize/prediction exceptions
+                        pass
 
         return jsonify({"sign": ""})
     except Exception as e:
