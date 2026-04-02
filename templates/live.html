@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Sign Detection</title>
+    <!-- Use Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #12141a;
+            --panel-bg: #181b23;
+            --card-bg: #222632;
+            --border-color: #373c4e;
+            --text-main: #e4e6ec;
+            --text-muted: #696e82;
+            --accent-teal: #a0d282;
+            --accent-red: #505ad2;
+            --accent-gold: #c89637;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            padding: 1.5rem 0;
+            text-align: center;
+            background-color: var(--panel-bg);
+            border-bottom: 4px solid var(--accent-gold);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            margin: 0;
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #fff, #a0d282);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            margin: 0.5rem 0 0 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            width: 90%;
+            max-width: 1200px;
+            padding-bottom: 2rem;
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: center;
+            }
+        }
+
+        .stream-card {
+            background-color: var(--panel-bg);
+            border-radius: 16px;
+            padding: 1rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stream-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: #000;
+            aspect-ratio: 4/3;
+        }
+
+        .stream-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transform: scaleX(-1); /* Mirror webcam */
+        }
+
+        .prediction-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-height: 350px;
+        }
+
+        .prediction-card h2 {
+            margin: 0 0 1rem 0;
+            color: var(--text-muted);
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sign-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            width: 100%;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            border: 1px dashed var(--border-color);
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .sign-text {
+            font-size: 8rem;
+            font-weight: 800;
+            color: var(--text-main);
+            text-transform: uppercase;
+            line-height: indulgence;
+            text-shadow: 0 0 20px rgba(160, 210, 130, 0.4);
+        }
+
+        .sign-display.active {
+            border-color: var(--accent-teal);
+            box-shadow: inset 0 0 20px rgba(160, 210, 130, 0.1);
+        }
+
+        .controls {
+            width: 100%;
+            display: flex;
+            gap: 1rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-detect {
+            background-color: var(--accent-teal);
+            color: #12141a;
+            box-shadow: 0 4px 15px rgba(160, 210, 130, 0.3);
+        }
+
+        .btn-detect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(160, 210, 130, 0.4);
+        }
+
+        .btn-detect.active {
+            background-color: var(--accent-red);
+            box-shadow: 0 4px 15px rgba(80, 90, 210, 0.3);
+            color: #fff;
+        }
+
+        .btn-detect.active:hover {
+            box-shadow: 0 6px 20px rgba(80, 90, 210, 0.4);
+        }
+
+        .sentence-box {
+            width: 100%;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            text-align: left;
+            min-height: 60px;
+            font-size: 1.2rem;
+            word-wrap: break-word;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        .btn-small {
+            flex: 1;
+            padding: 0.5rem;
+            background-color: var(--border-color);
+            color: var(--text-main);
+            font-size: 0.8rem;
+        }
+
+        .btn-small:hover {
+            background-color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SignSpeak</h1>
+        <p>Real-Time Sign Language Translation</p>
+    </header>
+
+    <div class="container">
+        <div class="stream-card">
+            <div class="stream-wrapper">
+                <video id="webcam" autoplay playsinline></video>
+                <canvas id="canvas" style="display:none;"></canvas>
+            </div>
+            <div style="margin-top: 1rem; width:100%; display: flex; justify-content: space-between; color: var(--text-muted); font-size:0.9rem;">
+                <span>Live Feed</span>
+                <span style="color: var(--accent-teal);">● Active</span>
+            </div>
+        </div>
+
+        <div class="prediction-card">
+            <h2>Current Sign</h2>
+            
+            <div class="sign-display" id="signDisplayBox">
+                <span class="sign-text" id="predictedSign">—</span>
+            </div>
+
+            <div class="controls">
+                <button class="btn-detect" id="toggleDetectBtn">Start Detecting</button>
+            </div>
+
+            <div style="width:100%; margin-top:2rem; text-align: left;">
+                <h2 style="margin-bottom:0.5rem;">Sentence Builder (Beta)</h2>
+                <div class="sentence-box" id="sentenceBox"></div>
+                <div class="actions">
+                    <button class="btn-small" onclick="addSignToSentence()">Add to Sentence</button>
+                    <button class="btn-small" onclick="clearSentence()">Clear</button>
+                    <button class="btn-small" onclick="speakSentence()" style="background-color: var(--accent-gold); color: #12141a;">Speak</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isDetecting = false;
+        let detectInterval;
+        const toggleDetectBtn = document.getElementById('toggleDetectBtn');
+        const predictedSignSpan = document.getElementById('predictedSign');
+        const signDisplayBox = document.getElementById('signDisplayBox');
+        const sentenceBox = document.getElementById('sentenceBox');
+        
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentSign = "";
+
+        // Start Webcam
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+                alert("Please enable webcam access to use this application.");
+            }
+        }
+        
+        // Start webcam on load
+        window.addEventListener('load', startWebcam);
+
+        // Function to capture frame and send it to server
+        async function fetchPrediction() {
+            if (!isDetecting) return;
+            
+            try {
+                // Set canvas size to video size
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                if(canvas.width === 0 || canvas.height === 0) return; // Video not ready
+                
+                // Draw current video frame to canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Convert to base64 JPEG
+                const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+                
+                // Post data to server
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: dataURL })
+                });
+                
+                const data = await response.json();
+                
+                if (data.sign && data.sign !== "") {
+                    // Update display
+                    predictedSignSpan.innerText = data.sign.toUpperCase();
+                    currentSign = data.sign;
+                    
+                    // Flash effect
+                    signDisplayBox.classList.add('active');
+                    setTimeout(() => signDisplayBox.classList.remove('active'), 300);
+                } else {
+                    predictedSignSpan.innerText = "—";
+                    currentSign = "";
+                }
+
+            } catch (error) {
+                console.error("Error fetching prediction:", error);
+            }
+        }
+
+        // Toggle detection state
+        toggleDetectBtn.addEventListener('click', () => {
+            isDetecting = !isDetecting;
+            
+            if (isDetecting) {
+                toggleDetectBtn.innerText = "Stop Detecting";
+                toggleDetectBtn.classList.add('active');
+                // Poll every 1 second
+                detectInterval = setInterval(fetchPrediction, 1000);
+            } else {
+                toggleDetectBtn.innerText = "Start Detecting";
+                toggleDetectBtn.classList.remove('active');
+                clearInterval(detectInterval);
+                predictedSignSpan.innerText = "—";
+                currentSign = "";
+            }
+        });
+
+        // Sentence Builder Functions
+        function addSignToSentence() {
+            if(currentSign) {
+                if(currentSign === "space") {
+                    sentenceBox.innerText += " ";
+                } else if(currentSign === "delete") {
+                    if (sentenceBox.innerText.length > 0) {
+                        sentenceBox.innerText = sentenceBox.innerText.slice(0, -1);
+                    }
+                } else {
+                    sentenceBox.innerText += currentSign;
+                }
+            }
+        }
+
+        function clearSentence() {
+            sentenceBox.innerText = "";
+        }
+
+        // Use Web Speech API for TTS
+        function speakSentence() {
+            const text = sentenceBox.innerText.trim();
+            if(text !== "") {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    </script>
+</body>
+</html>
