@@ -1,7 +1,6 @@
 Flask==3.0.3
 opencv-python-headless==4.9.0.80
-cvzone==1.6.1
-tensorflow-cpu
+tflite-runtime==2.14.0
 numpy==1.26.4
 gunicorn==22.0.0
 mediapipe==0.10.11
